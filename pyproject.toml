@@ -1,0 +1,8 @@
+[project]
+name = "nano-mie"
+version = "0.1.0"
+description = "Synthetic Mie scattering dataset generation for nanophotonic ML/RL"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+where = ["src"]

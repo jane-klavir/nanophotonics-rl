@@ -1,0 +1,5 @@
+data/processed/*.npz
+outputs/figures/*.png
+__pycache__/
+*.egg-info/
+.venv/
