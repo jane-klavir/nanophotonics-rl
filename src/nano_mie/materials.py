@@ -1,7 +1,7 @@
 import numpy as np
 
 
-GOLD_JC_LAMBDA_NM = np.array(
+GOLD_LAMBDA_NM = np.array(
     [
         187.9, 191.6, 195.3, 199.3, 203.3, 207.3, 211.9, 216.4, 221.4, 226.2,
         231.3, 237.1, 242.6, 249.0, 255.1, 261.6, 268.9, 276.1, 284.4, 292.4,
@@ -11,7 +11,7 @@ GOLD_JC_LAMBDA_NM = np.array(
     ]
 )
 
-GOLD_JC_N = np.array(
+GOLD_N = np.array(
     [
         1.28, 1.32, 1.34, 1.33, 1.33, 1.30, 1.30, 1.30, 1.30, 1.31,
         1.30, 1.32, 1.32, 1.33, 1.33, 1.35, 1.38, 1.43, 1.47, 1.49,
@@ -21,7 +21,7 @@ GOLD_JC_N = np.array(
     ]
 )
 
-GOLD_JC_K = np.array(
+GOLD_K = np.array(
     [
         1.188, 1.203, 1.226, 1.251, 1.277, 1.304, 1.350, 1.387, 1.427, 1.460,
         1.497, 1.536, 1.577, 1.631, 1.688, 1.749, 1.803, 1.847, 1.869, 1.878,
@@ -32,21 +32,18 @@ GOLD_JC_K = np.array(
 )
 
 
-def gold_jc_nk(wavelengths_nm: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def gold_nk(wavelengths_nm: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
-    Johnson & Christy gold complex refractive index, interpolated onto the
-    requested wavelength grid (nm). Source table: refractiveindex.info / Au / Johnson,
-    as shipped with miepython's 04_gold.py example.
-
-    Wavelengths outside the tabulated range [187.9, 1937] nm are clipped to the
-    endpoint values via np.interp's default behavior.
+    Gold complex refractive index, interpolated onto the requested wavelength
+    grid (nm). Wavelengths outside [187.9, 1937] nm are clipped to the endpoint
+    values via np.interp's default behavior.
     """
     wl = np.asarray(wavelengths_nm, dtype=float)
-    n_arr = np.interp(wl, GOLD_JC_LAMBDA_NM, GOLD_JC_N)
-    k_arr = np.interp(wl, GOLD_JC_LAMBDA_NM, GOLD_JC_K)
+    n_arr = np.interp(wl, GOLD_LAMBDA_NM, GOLD_N)
+    k_arr = np.interp(wl, GOLD_LAMBDA_NM, GOLD_K)
     return n_arr, k_arr
 
 
 MATERIALS = {
-    "gold_JC": gold_jc_nk,
+    "gold": gold_nk,
 }

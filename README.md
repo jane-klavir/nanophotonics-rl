@@ -35,7 +35,7 @@ Plot a random generated spectrum:
 python scripts/plot_random_spectrum.py
 ```
 
-Generate Mie spectra for Johnson & Christy gold spheres across a sweep of radii (mirrors the `miepython` `04_gold.py` example):
+Generate Mie spectra for gold spheres across a sweep of radii:
 ```bash
 python scripts/generate_gold_spectra.py
 ```
@@ -52,20 +52,19 @@ wavelength-dependent `n(λ), k(λ)`:
 | `wavelengths_nm` | `(W,)` | Shared wavelength grid (nm) |
 | `X_scalar` | `(N, 2)` | Per-sample scalars: `[radius_nm, n_medium]` |
 | `X_material` | `(N, W, 2)` | Per-sample `[n(λ), k(λ)]` (constant samples are broadcast across `W`) |
-| `material_id` | `(N,)` | String tag, e.g. `"synthetic_const"`, `"gold_JC"` |
+| `material_id` | `(N,)` | String tag, e.g. `"synthetic_const"`, `"gold"` |
 | `Y_qext`, `Y_qsca`, `Y_qabs`, `Y_qback`, `Y_g` | `(N, W)` | Mie efficiencies and asymmetry parameter |
 | `Y_sigma_ext`, `Y_sigma_sca`, `Y_sigma_abs` | `(N, W)` | Cross-sections (`q · π r²`) |
 | `Y_log_sigma_*_over_geo` | `(N, W)` | `log(q + ε)` — useful for training targets |
 
 The same schema is used regardless of whether `n, k` come from a synthetic grid
-sweep or an experimental / reference table such as Johnson & Christy gold —
-constant-in-λ samples simply have `X_material[i, :, 0]` and `X_material[i, :, 1]`
-set to constant arrays.
+sweep or a tabulated reference material — constant-in-λ samples simply have
+`X_material[i, :, 0]` and `X_material[i, :, 1]` set to constant arrays.
 
 ## Materials
 
 `nano_mie.materials` exposes tabulated complex refractive indices, interpolated
 onto an arbitrary wavelength grid. Currently included:
 
-- `gold_JC` — Johnson & Christy gold (the table shipped with `miepython`'s
+- `gold` — tabulated gold `n(λ), k(λ)` (the same table shipped with `miepython`'s
   `04_gold.py` example, converted to nm).
