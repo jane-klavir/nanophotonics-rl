@@ -21,6 +21,8 @@ class MieDatasetConfig:
     k_max: float = 1.0
     n_absorption_values: int = 25
 
+    n_medium: float = 1.0
+
     output_dir: Path = Path("data/processed")
     output_filename: str = "mie_dataset_v1.npz"
 

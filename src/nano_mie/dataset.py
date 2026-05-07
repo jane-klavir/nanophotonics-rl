@@ -5,89 +5,79 @@ from nano_mie.config import MieDatasetConfig
 from nano_mie.simulator import compute_mie_spectrum
 
 
-def generate_dataset(config: MieDatasetConfig) -> dict[str, np.ndarray]:
+SPECTRUM_KEYS = (
+    "qext", "qsca", "qabs", "qback", "g",
+    "sigma_ext", "sigma_sca", "sigma_abs",
+    "log_sigma_ext_over_geo", "log_sigma_sca_over_geo", "log_sigma_abs_over_geo",
+)
+
+
+def _empty_y(n_samples: int, n_wavelengths: int) -> dict[str, np.ndarray]:
+    return {key: np.empty((n_samples, n_wavelengths), dtype=float) for key in SPECTRUM_KEYS}
+
+
+def build_dataset_from_samples(
+    samples: list[dict],
+    wavelengths_nm: np.ndarray,
+    n_medium: float = 1.0,
+) -> dict[str, np.ndarray]:
     """
-    Generate an ML-ready Mie dataset.
-
-    Inputs:
-        X[:, 0] = radius_nm
-        X[:, 1] = n
-        X[:, 2] = k
-
-    Outputs:
-        - Y_qext, Y_qsca, Y_qabs, Y_qback, Y_g
-        - Y_sigma_ext, Y_sigma_sca, Y_sigma_abs
-        - Y_log_sigma_ext_over_geo, Y_log_sigma_sca_over_geo, Y_log_sigma_abs_over_geo
-
-        each with shape (n_samples, n_wavelengths)
+    Generic dataset builder. Each `sample` is a dict with:
+      - radius_nm: float
+      - n: scalar or (W,) array
+      - k: scalar or (W,) array
+      - material_id: str
     """
-    wavelengths_nm = config.wavelengths_nm
+    wavelengths_nm = np.asarray(wavelengths_nm, dtype=float)
+    W = wavelengths_nm.size
+    N = len(samples)
 
-    parameter_grid = [
-        (radius_nm, n, k)
-        for radius_nm in config.radii_nm
-        for n in config.n_values
-        for k in config.k_values
-    ]
+    X_scalar = np.empty((N, 2), dtype=float)
+    X_material = np.empty((N, W, 2), dtype=float)
+    material_id = np.empty(N, dtype=object)
 
-    n_samples = len(parameter_grid)
-    n_wavelengths = len(wavelengths_nm)
+    Y = _empty_y(N, W)
 
-    X = np.empty((n_samples, 3), dtype=float)
-
-    Y_qext = np.empty((n_samples, n_wavelengths), dtype=float)
-    Y_qsca = np.empty((n_samples, n_wavelengths), dtype=float)
-    Y_qabs = np.empty((n_samples, n_wavelengths), dtype=float)
-    Y_qback = np.empty((n_samples, n_wavelengths), dtype=float)
-    Y_g = np.empty((n_samples, n_wavelengths), dtype=float)
-
-    Y_sigma_ext = np.empty((n_samples, n_wavelengths), dtype=float)
-    Y_sigma_sca = np.empty((n_samples, n_wavelengths), dtype=float)
-    Y_sigma_abs = np.empty((n_samples, n_wavelengths), dtype=float)
-
-    Y_log_sigma_ext_over_geo = np.empty((n_samples, n_wavelengths), dtype=float)
-    Y_log_sigma_sca_over_geo = np.empty((n_samples, n_wavelengths), dtype=float)
-    Y_log_sigma_abs_over_geo = np.empty((n_samples, n_wavelengths), dtype=float)
-
-    for idx, (radius_nm, n, k) in enumerate(tqdm(parameter_grid)):
-        spectrum = compute_mie_spectrum(
-            radius_nm=radius_nm,
-            n=n,
-            k=k,
+    for i, sample in enumerate(tqdm(samples)):
+        spec = compute_mie_spectrum(
+            radius_nm=sample["radius_nm"],
+            n=sample["n"],
+            k=sample["k"],
             wavelengths_nm=wavelengths_nm,
+            n_medium=n_medium,
         )
+        X_scalar[i] = [sample["radius_nm"], n_medium]
+        X_material[i, :, 0] = spec["n_lambda"]
+        X_material[i, :, 1] = spec["k_lambda"]
+        material_id[i] = sample.get("material_id", "synthetic_const")
 
-        X[idx] = np.array([radius_nm, n, k])
-
-        Y_qext[idx] = spectrum["qext"]
-        Y_qsca[idx] = spectrum["qsca"]
-        Y_qabs[idx] = spectrum["qabs"]
-        Y_qback[idx] = spectrum["qback"]
-        Y_g[idx] = spectrum["g"]
-
-        Y_sigma_ext[idx] = spectrum["sigma_ext"]
-        Y_sigma_sca[idx] = spectrum["sigma_sca"]
-        Y_sigma_abs[idx] = spectrum["sigma_abs"]
-
-        Y_log_sigma_ext_over_geo[idx] = spectrum["log_sigma_ext_over_geo"]
-        Y_log_sigma_sca_over_geo[idx] = spectrum["log_sigma_sca_over_geo"]
-        Y_log_sigma_abs_over_geo[idx] = spectrum["log_sigma_abs_over_geo"]
+        for key in SPECTRUM_KEYS:
+            Y[key][i] = spec[key]
 
     return {
         "wavelengths_nm": wavelengths_nm,
-        "X": X,
-        "Y_qext": Y_qext,
-        "Y_qsca": Y_qsca,
-        "Y_qabs": Y_qabs,
-        "Y_qback": Y_qback,
-        "Y_g": Y_g,
-        "Y_sigma_ext": Y_sigma_ext,
-        "Y_sigma_sca": Y_sigma_sca,
-        "Y_sigma_abs": Y_sigma_abs,
-        "Y_log_sigma_ext_over_geo": Y_log_sigma_ext_over_geo,
-        "Y_log_sigma_sca_over_geo": Y_log_sigma_sca_over_geo,
-        "Y_log_sigma_abs_over_geo": Y_log_sigma_abs_over_geo,
+        "X_scalar": X_scalar,
+        "X_material": X_material,
+        "material_id": material_id.astype(str),
+        **{f"Y_{k}": v for k, v in Y.items()},
     }
+
+
+def generate_dataset(config: MieDatasetConfig) -> dict[str, np.ndarray]:
+    """
+    Synthetic grid sweep over (radius, n, k) with constant-in-λ material.
+    """
+    samples = [
+        {"radius_nm": r, "n": n, "k": k, "material_id": "synthetic_const"}
+        for r in config.radii_nm
+        for n in config.n_values
+        for k in config.k_values
+    ]
+    return build_dataset_from_samples(
+        samples=samples,
+        wavelengths_nm=config.wavelengths_nm,
+        n_medium=config.n_medium,
+    )
 
 
 def save_dataset(dataset: dict[str, np.ndarray], output_path) -> None:
@@ -96,5 +86,5 @@ def save_dataset(dataset: dict[str, np.ndarray], output_path) -> None:
 
 
 def load_dataset(path) -> dict[str, np.ndarray]:
-    data = np.load(path)
+    data = np.load(path, allow_pickle=True)
     return {key: data[key] for key in data.files}
