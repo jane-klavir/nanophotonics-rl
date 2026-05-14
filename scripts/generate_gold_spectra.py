@@ -18,8 +18,8 @@ from nano_mie.dataset import build_dataset_from_samples, save_dataset
 from nano_mie.materials import gold_nk
 
 
-RADII_NM = [20.0, 40.0, 80.0, 100.0, 150.0, 200.0]
-WAVELENGTHS_NM = np.linspace(300.0, 900.0, 301)
+RADII_NM = [300.0, 400.0, 500.0, 600.0, 700.0, 800.0]
+WAVELENGTHS_NM = np.linspace(20.0, 2000.0, 301)
 N_MEDIUM = 1.0
 OUTPUT_PATH = Path("data/processed/mie_gold_v1.npz")
 FIGURE_PATH = Path("outputs/figures/gold_radius_sweep.png")

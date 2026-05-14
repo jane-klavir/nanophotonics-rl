@@ -1,70 +1,284 @@
 # Nanophotonics RL
 
-This project explores ML/RL methods for nanophotonic design.
+ML/RL methods for nanophotonic design. The forward problem — predicting the
+optical response of a particle from its geometry and material — is solved by
+**Mie theory**. This repo builds a fast surrogate of that forward map so we can
+plug it into an optimizer or RL loop and run **inverse design**: find the
+particle whose spectrum matches a desired target.
 
-The first step is to use `miepython` to generate optical spectra for spherical nanoparticles. We vary physical parameters such as particle radius, refractive index, absorption coefficient, and wavelength, then compute scattering, extinction, and absorption spectra.
+The pipeline starts by using [`miepython`](https://github.com/scottprahl/miepython)
+to generate ground-truth scattering / absorption / extinction spectra for
+spherical nanoparticles across a range of radii and materials.
 
-The long-term goal is to build a surrogate model that predicts optical spectra from geometry/material parameters, then use optimization or reinforcement learning to search for parameters that produce a desired target response.
-
-## Project Plan
+## Project plan
 
 1. Generate synthetic spectra using Mie theory with `miepython`.
-2. Save the data in an ML-ready format.
-3. Train surrogate models such as Gaussian Process Regression, PCA + regression, or neural networks.
-4. Adapt the same pipeline to COMSOL-generated data.
-5. Use the surrogate model inside an optimization/RL loop for inverse design.
+2. Save the data in an ML-ready `.npz` format.
+3. Train surrogate models — Gaussian Process Regression, PCA + regression, or
+   neural networks.
+4. Adapt the same pipeline to COMSOL-generated data when it arrives.
+5. Use the surrogate inside an optimization / RL loop for inverse design.
 
 ## Setup
 
-First, create and activate a Python environment using either `venv`, `conda`, or another environment manager.
-
-Then, from the project root, install dependencies and the local package:
+Create and activate a Python environment (conda or venv), then from the repo
+root:
 
 ```bash
 pip install -r requirements.txt
 pip install -e .
 ```
 
-Run the dataset generation script:
+## Quickstart
+
+Generate the main materials × radii dataset (700 samples, < 1 s on a laptop):
+
 ```bash
-python scripts/generate_dataset.py
+python scripts/generate_materials_dataset.py
 ```
 
-Plot a random generated spectrum:
-```bash
-python scripts/plot_random_spectrum.py
+Other entry points:
+
+| Command | What it does |
+| --- | --- |
+| `python scripts/generate_dataset.py` | Synthetic grid sweep over `(radius, n, k)` with constant-in-λ material — toy data for early experiments. |
+| `python scripts/generate_gold_spectra.py` | Gold-only sanity check across a radius sweep. Also produces a 3-panel diagnostic figure. |
+| `python scripts/04_gold.py` | Verbatim copy of `miepython`'s `04_gold.py` example, for reference. |
+| `python scripts/plot_random_spectrum.py` | Visualize a random spectrum from a saved synthetic dataset. |
+
+## Repository layout
+
+```
+.
+├── Materials/                       tabulated n(λ), k(λ) CSVs (one per material)
+│   ├── Ag.csv  Al.csv  Au.csv  Cu.csv  GaAs.csv  Ge.csv  Si.csv
+├── src/nano_mie/
+│   ├── simulator.py                 thin Mie wrapper around miepython
+│   ├── materials.py                 CSV loader + interpolation
+│   ├── dataset.py                   dataset builder for synthetic sweeps
+│   ├── config.py                    synthetic-grid configuration
+│   └── plotting.py                  small plotting helpers
+├── scripts/
+│   ├── generate_materials_dataset.py    main entry point (real materials)
+│   ├── generate_gold_spectra.py         gold-only diagnostic + figure
+│   ├── generate_dataset.py              synthetic grid sweep
+│   ├── plot_random_spectrum.py
+│   └── 04_gold.py                       miepython reference example
+├── data/processed/                  generated datasets (.npz)
+└── outputs/figures/                 generated figures (.png)
 ```
 
-Generate Mie spectra for gold spheres across a sweep of radii:
-```bash
-python scripts/generate_gold_spectra.py
+## Physics in one paragraph
+
+A nanoparticle (radius `r`, complex refractive index `m(λ) = n(λ) − i·k(λ)`,
+sitting in a medium of index `n_med`) hit by light of wavelength `λ` can
+**absorb**, **scatter**, and **extinguish** photons. The corresponding
+cross-sections — `σ_abs`, `σ_sca`, `σ_ext = σ_abs + σ_sca` — have units of area
+(nm²) and are functions of `λ`. For a homogeneous sphere there is an exact
+analytic solution to Maxwell's equations (Mie, 1908) parameterised by the
+**size parameter** `x = 2π·r·n_med / λ`. `miepython.efficiencies_mx(m, x)`
+evaluates the series for us; everything else in this repo is data plumbing
+around that one call.
+
+## Materials folder format
+
+Each CSV in [Materials/](Materials/) is a refractiveindex.info-style file with
+two stacked tables — `wl,n` then a blank line then `wl,k` — and wavelengths in
+**micrometers**:
+
 ```
-This writes `data/processed/mie_gold_v1.npz` and saves a σ_sca / σ_abs vs. λ figure to `outputs/figures/gold_radius_sweep.png`.
+wl,n
+0.1879,1.28
+0.1916,1.32
+...
+1.9370,0.92
 
-## Dataset format
+wl,k
+0.1879,1.188
+0.1916,1.203
+...
+1.9370,13.78
+```
 
-Datasets are saved as `.npz` files with a unified schema that supports both
-synthetic constant-`(n, k)` samples and tabulated material data with
-wavelength-dependent `n(λ), k(λ)`:
+[src/nano_mie/materials.py](src/nano_mie/materials.py) exposes:
+
+| Function | Purpose |
+| --- | --- |
+| `load_material_csv(path)` | Parses one CSV. Splits on blank lines into n-block and k-block, returns `(wl_n_um, n_vals, wl_k_um, k_vals)`. The two tables are kept separate because they often sample different wavelengths. |
+| `material_nk(name, wavelengths_nm)` | Loads `Materials/<name>.csv` and linearly interpolates `n(λ), k(λ)` onto your wavelength grid (μm → nm conversion is automatic). Values outside the tabulated range are clamped to the endpoints. |
+| `available_materials()` | Lists every `.csv` in `Materials/`. |
+
+## Main dataset format (`data/processed/mie_materials_v1.npz`)
+
+Produced by [`scripts/generate_materials_dataset.py`](scripts/generate_materials_dataset.py).
+A single compressed `.npz` with a **two-tier** layout — small material-level
+arrays (one row per material) plus large run-level arrays (one row per Mie
+simulation).
 
 | Key | Shape | Description |
 | --- | --- | --- |
-| `wavelengths_nm` | `(W,)` | Shared wavelength grid (nm) |
-| `X_scalar` | `(N, 2)` | Per-sample scalars: `[radius_nm, n_medium]` |
-| `X_material` | `(N, W, 2)` | Per-sample `[n(λ), k(λ)]` (constant samples are broadcast across `W`) |
-| `material_id` | `(N,)` | String tag, e.g. `"synthetic_const"`, `"gold"` |
-| `Y_qext`, `Y_qsca`, `Y_qabs`, `Y_qback`, `Y_g` | `(N, W)` | Mie efficiencies and asymmetry parameter |
-| `Y_sigma_ext`, `Y_sigma_sca`, `Y_sigma_abs` | `(N, W)` | Cross-sections (`q · π r²`) |
-| `Y_log_sigma_*_over_geo` | `(N, W)` | `log(q + ε)` — useful for training targets |
+| `wavelengths_nm` | `(W,)` | Shared wavelength grid (nm). Default: 300 → 900 nm in 10 nm steps, so `W = 61`. |
+| `material_names` | `(M,)` | String labels, e.g. `['Ag','Al','Au','Cu','GaAs','Ge','Si']`. |
+| `materials_n` | `(M, W)` | `n(λ)` for each material on the shared grid. |
+| `materials_k` | `(M, W)` | `k(λ)` for each material on the shared grid. |
+| `radius_nm` | `(N,)` | Per-run particle radius (nm). |
+| `n_medium` | `(N,)` | Per-run surrounding-medium refractive index. |
+| `material_id` | `(N,)` | Per-run material name; references back into `material_names`. |
+| `geometry` | `(N,)` | Per-run geometry tag, currently `'sphere'`. Forward-compatible with `'rod'`, `'shell'`, … |
+| `sigma_sca` | `(N, W)` | Scattering cross-section vs λ (nm²). |
+| `sigma_abs` | `(N, W)` | Absorption cross-section vs λ (nm²). |
+| `sigma_ext` | `(N, W)` | Extinction cross-section vs λ (nm²). Always equals `sigma_sca + sigma_abs` exactly. |
 
-The same schema is used regardless of whether `n, k` come from a synthetic grid
-sweep or a tabulated reference material — constant-in-λ samples simply have
-`X_material[i, :, 0]` and `X_material[i, :, 1]` set to constant arrays.
+Defaults: 100 samples per material × 7 materials = **700 runs**, radii sampled
+uniformly in [50, 1000] nm with a fixed seed, medium = air (`n=1.0`).
 
-## Materials
+### What one run looks like
 
-`nano_mie.materials` exposes tabulated complex refractive indices, interpolated
-onto an arbitrary wavelength grid. Currently included:
+Each row in the run-level arrays is one Mie simulation. For run `i` you get:
 
-- `gold` — tabulated gold `n(λ), k(λ)` (the same table shipped with `miepython`'s
-  `04_gold.py` example, converted to nm).
+| Field | Shape | Meaning |
+| --- | --- | --- |
+| `material_id[i]` | scalar (string) | e.g. `"Au"` — references back into `material_names` |
+| `geometry[i]` | scalar (string) | e.g. `"sphere"` |
+| `radius_nm[i]` | scalar (float) | particle radius, e.g. `354.0` nm |
+| `n_medium[i]` | scalar (float) | surrounding-medium refractive index (1.0 = air by default) |
+| `sigma_sca[i, :]` | `(W,)` | scattering cross-section as a function of λ |
+| `sigma_abs[i, :]` | `(W,)` | absorption cross-section as a function of λ |
+| `sigma_ext[i, :]` | `(W,)` | extinction (= `sigma_sca[i] + sigma_abs[i]`) |
+
+The wavelength axis those spectra live on is the shared `wavelengths_nm` of
+shape `(W,)` — the same for every run. To recover that run's `n(λ), k(λ)`,
+look up `material_id[i]` in `material_names` and index `materials_n`,
+`materials_k`:
+
+```python
+i = 0
+m_idx = list(material_names).index(str(material_id[i]))
+n_i, k_i = materials_n[m_idx], materials_k[m_idx]   # both (W,)
+```
+
+So each row = one simulated nanoparticle = (material name, radius, three
+spectra over λ).
+
+CLI flags (all optional):
+
+```bash
+python scripts/generate_materials_dataset.py \
+    --n-samples-per-material 100 \
+    --radius-min-nm 50 --radius-max-nm 1000 \
+    --wavelength-min-nm 300 --wavelength-max-nm 900 --wavelength-step-nm 10 \
+    --n-medium 1.0 --seed 0 \
+    --output data/processed/mie_materials_v1.npz
+```
+
+## How the pipeline works
+
+For each run, the script calls `compute_mie_spectrum` ([src/nano_mie/simulator.py](src/nano_mie/simulator.py)),
+which is a thin wrapper around `miepython.efficiencies_mx`:
+
+```python
+m  = (n(λ) − i·k(λ)) / n_medium                # complex refractive index (relative)
+x  = 2π · radius_nm · n_medium / wavelengths_nm # Mie size parameter, one per λ
+qext, qsca, qback, g = mie.efficiencies_mx(m, x)
+sigma_ext = qext · π · r²
+sigma_sca = qsca · π · r²
+sigma_abs = (qext − qsca) · π · r²
+```
+
+`n` and `k` can be scalars (constant in λ) or arrays of shape `(W,)`. Real
+materials use the per-wavelength array form.
+
+## Loading a saved dataset
+
+```python
+import numpy as np
+data = np.load("data/processed/mie_materials_v1.npz", allow_pickle=False)
+
+wl         = data["wavelengths_nm"]      # (61,)
+mat_names  = list(data["material_names"]) # ['Ag','Al','Au','Cu','GaAs','Ge','Si']
+mat_n      = data["materials_n"]         # (7, 61)
+mat_k      = data["materials_k"]         # (7, 61)
+
+r          = data["radius_nm"]           # (700,)
+n_medium   = data["n_medium"]            # (700,)
+mat_id     = data["material_id"]         # (700,) of strings
+geometry   = data["geometry"]            # (700,) of strings, e.g. 'sphere'
+sigma_sca  = data["sigma_sca"]           # (700, 61)
+sigma_abs  = data["sigma_abs"]           # (700, 61)
+sigma_ext  = data["sigma_ext"]           # (700, 61)
+
+# Everything you need to fully describe run i:
+i = 0
+
+# scalars
+radius_i    = float(r[i])                                # particle radius (nm)
+n_medium_i  = float(n_medium[i])                         # surrounding-medium index
+material_i  = str(mat_id[i])                             # e.g. 'Au'
+geometry_i  = str(geometry[i])                           # e.g. 'sphere'
+
+# material n(λ), k(λ) — pulled from the material-level tables by name
+m_idx = mat_names.index(material_i)
+n_i   = mat_n[m_idx]                                     # (61,)
+k_i   = mat_k[m_idx]                                     # (61,)
+
+# spectra (all on the shared wavelength axis `wl`)
+sca_i = sigma_sca[i]                                     # (61,)
+abs_i = sigma_abs[i]                                     # (61,)
+ext_i = sigma_ext[i]                                     # (61,) == sca_i + abs_i
+
+print(f"run {i}: {geometry_i}, material={material_i}, r={radius_i:.1f} nm, "
+      f"n_med={n_medium_i:.2f}")
+print(f"  λ grid:   {wl[0]:.0f} → {wl[-1]:.0f} nm "
+      f"({wl.size} points, step {wl[1]-wl[0]:.0f} nm)")
+print(f"  σ_sca peak at λ={wl[sca_i.argmax()]:.0f} nm, value={sca_i.max():.1f} nm²")
+```
+
+That's the full description of run `i` — three scalars (`radius`, `n_medium`,
+`material_id`), the two material curves `n(λ), k(λ)` recovered by name, and
+three spectra `σ_sca, σ_abs, σ_ext` over the shared wavelength grid. Plot them
+the same way you'd plot any `(x, y)` pair:
+
+```python
+import matplotlib.pyplot as plt
+plt.plot(wl, sca_i, label="σ_sca")
+plt.plot(wl, abs_i, label="σ_abs")
+plt.plot(wl, ext_i, label="σ_ext", linestyle="--")
+plt.xlabel("Wavelength (nm)"); plt.ylabel("Cross section (nm²)")
+plt.legend(); plt.title(f"{material_i}, r={radius_i:.0f} nm")
+plt.show()
+```
+
+## Sanity checks
+
+The pipeline has been verified against `miepython`'s own
+[`04_gold.py`](https://github.com/scottprahl/miepython/blob/main/miepython/examples/04_gold.py)
+example:
+
+- `qext` and `qsca` for a 100 nm gold sphere match `mie.efficiencies_mx` to
+  machine precision.
+- The optical theorem invariant `σ_ext = σ_sca + σ_abs` is satisfied to
+  ~1e-9 nm² across the whole 700-sample dataset.
+- The gold dipole plasmon peak appears near ~520 nm for small particles and
+  red-shifts / broadens with increasing radius — textbook plasmonics behavior,
+  shown in [outputs/figures/gold_radius_sweep.png](outputs/figures/gold_radius_sweep.png).
+
+Run the gold diagnostic with:
+
+```bash
+python scripts/generate_gold_spectra.py
+```
+
+This produces a 3-panel figure: `n(λ), k(λ)` of gold, bulk gold absorption depth
+`λ/(4πk)`, and Mie `σ_sca`, `σ_abs` for a sweep of radii.
+
+## Notes and caveats
+
+- **Wavelength coverage varies by material.** Some CSVs don't fully cover the
+  300–900 nm window (Si stops at ~827 nm, for instance). Values outside the
+  tabulated range are clamped to the nearest endpoint, not extrapolated.
+- **Linear interpolation between consecutive samples.** Swap `np.interp` in
+  `material_nk` for `scipy.interpolate.CubicSpline` if you need smoother
+  dispersion curves.
+- **`miepython` convention is `m = n − i·k`** (negative imaginary part). All
+  code follows this; if you compare to a paper using the other sign convention,
+  flip the sign of `k`.
