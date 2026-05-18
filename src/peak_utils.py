@@ -30,12 +30,6 @@ def build_peak_dataframe(
     prominence_frac: float = 0.14,
     verbose: bool = True,
 ) -> pd.DataFrame:
-    """
-    Extract local and global peaks for each material/radius combination.
-
-    peak_mode=1 uses scattering as anchor.
-    peak_mode=0 uses absorption as anchor.
-    """
     rows = []
     wl = data.wavelengths_nm
 
@@ -78,7 +72,6 @@ def build_combo_lookup(
     global_only: int = 1,
     verbose: bool = True,
 ) -> tuple[pd.DataFrame, ErrorScales]:
-    """Create one lookup row per material/radius and compute normalisation scales."""
     lookup_src = peak_df[peak_df["is_global"]].copy() if global_only else peak_df.copy()
 
     scales = ErrorScales(
