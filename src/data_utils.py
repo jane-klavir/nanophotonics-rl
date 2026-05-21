@@ -13,7 +13,6 @@ class MieData:
 
 
 def load_mie_data(path: str | Path, verbose: bool = True) -> MieData:
-    """Load precomputed Mie simulation data from an .npz file."""
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(f"Data file not found: {path}")

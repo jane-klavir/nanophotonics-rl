@@ -117,7 +117,6 @@ class MieEnv:
             self.mat_idx = (self.mat_idx - 1) % self.n_mats
             self.mat = self.mat_list[self.mat_idx]
             self.r_idx = min(self.r_idx, len(self.mat_radii[self.mat]) - 1)
-
         elif action == 3:
             self.mat_idx = (self.mat_idx + 1) % self.n_mats
             self.mat = self.mat_list[self.mat_idx]

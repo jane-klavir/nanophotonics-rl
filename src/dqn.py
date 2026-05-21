@@ -5,7 +5,6 @@ import torch.nn as nn
 
 
 class DQN(nn.Module):
-    """Dueling DQN network."""
 
     def __init__(self, state_dim: int, n_actions: int, hidden: int = 256):
         super().__init__()

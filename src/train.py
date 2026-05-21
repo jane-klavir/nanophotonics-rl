@@ -30,7 +30,6 @@ def train_dqn(
     config: TrainConfig | None = None,
     device: torch.device | str | None = None,
 ):
-    """Train a Double Dueling DQN on the Mie environment."""
     config = config if config is not None else TrainConfig()
     device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
     print("Device:", device)

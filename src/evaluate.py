@@ -15,7 +15,6 @@ def query(
     device: torch.device | str | None = None,
     verbose: bool = True,
 ) -> pd.DataFrame:
-    """Run greedy policy search for a user-specified target."""
     device = torch.device(device or next(net.parameters()).device)
     net.eval()
     results = []
