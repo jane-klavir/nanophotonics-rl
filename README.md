@@ -10,15 +10,6 @@ The pipeline starts by using [`miepython`](https://github.com/scottprahl/miepyth
 to generate ground-truth scattering / absorption / extinction spectra for
 spherical nanoparticles across a range of radii and materials.
 
-## Project plan
-
-1. Generate synthetic spectra using Mie theory with `miepython`.
-2. Save the data in an ML-ready `.npz` format.
-3. Train surrogate models — Gaussian Process Regression, PCA + regression, or
-   neural networks.
-4. Adapt the same pipeline to COMSOL-generated data when it arrives.
-5. Use the surrogate inside an optimization / RL loop for inverse design.
-
 ## Setup
 
 Create and activate a Python environment (conda or venv), then from the repo
