@@ -247,38 +247,3 @@ plt.xlabel("Wavelength (nm)"); plt.ylabel("Cross section (nm²)")
 plt.legend(); plt.title(f"{material_i}, r={radius_i:.0f} nm")
 plt.show()
 ```
-
-## Sanity checks
-
-The pipeline has been verified against `miepython`'s own
-[`04_gold.py`](https://github.com/scottprahl/miepython/blob/main/miepython/examples/04_gold.py)
-example:
-
-- `qext` and `qsca` for a 100 nm gold sphere match `mie.efficiencies_mx` to
-  machine precision.
-- The optical theorem invariant `σ_ext = σ_sca + σ_abs` is satisfied to
-  ~1e-9 nm² across the whole 700-sample dataset.
-- The gold dipole plasmon peak appears near ~520 nm for small particles and
-  red-shifts / broadens with increasing radius — textbook plasmonics behavior,
-  shown in [outputs/figures/gold_radius_sweep.png](outputs/figures/gold_radius_sweep.png).
-
-Run the gold diagnostic with:
-
-```bash
-python scripts/generate_gold_spectra.py
-```
-
-This produces a 3-panel figure: `n(λ), k(λ)` of gold, bulk gold absorption depth
-`λ/(4πk)`, and Mie `σ_sca`, `σ_abs` for a sweep of radii.
-
-## Notes and caveats
-
-- **Wavelength coverage varies by material.** Some CSVs don't fully cover the
-  300–900 nm window (Si stops at ~827 nm, for instance). Values outside the
-  tabulated range are clamped to the nearest endpoint, not extrapolated.
-- **Linear interpolation between consecutive samples.** Swap `np.interp` in
-  `material_nk` for `scipy.interpolate.CubicSpline` if you need smoother
-  dispersion curves.
-- **`miepython` convention is `m = n − i·k`** (negative imaginary part). All
-  code follows this; if you compare to a paper using the other sign convention,
-  flip the sign of `k`.
