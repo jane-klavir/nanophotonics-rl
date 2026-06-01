@@ -2,8 +2,7 @@
 
 ML/RL methods for nanophotonic design. The forward problem — predicting the
 optical response of a particle from its geometry and material — is solved by
-**Mie theory**. This repo builds a fast surrogate of that forward map so we can
-plug it into an optimizer or RL loop and run **inverse design**: find the
+**Mie theory**. This repo uses RL to do **inverse design**: find the
 particle whose spectrum matches a desired target.
 
 The pipeline starts by using [`miepython`](https://github.com/scottprahl/miepython)
