@@ -1,4 +1,10 @@
-# Nanophotonics RL
+# Reinforcement Learning for Inverse Design of
+Mie-Scattering Nanoparticles
+
+Furkan Akkoyun
+Mehmet Emre Andıran
+Jane Klavir
+Bekir Bartu Cebebi
 
 RL methods for nanophotonic design. The forward problem which predicts the
 optical response of a particle from its geometry and material is solved by
