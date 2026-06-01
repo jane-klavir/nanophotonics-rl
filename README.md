@@ -27,16 +27,6 @@ Generate the main materials × radii dataset (700 samples, < 1 s on a laptop):
 python scripts/generate_materials_dataset.py
 ```
 
-Other entry points:
-
-| Command | What it does |
-| --- | --- |
-| `python scripts/generate_dataset.py` | Synthetic grid sweep over `(radius, n, k)` with constant-in-λ material — toy data for early experiments. |
-| `python scripts/generate_gold_spectra.py` | Gold-only sanity check across a radius sweep. Also produces a 3-panel diagnostic figure. |
-| `python scripts/04_gold.py` | Verbatim copy of `miepython`'s `04_gold.py` example, for reference. |
-| `python scripts/plot_random_spectrum.py` | Visualize a random spectrum from a saved synthetic dataset. |
-
-
 ## Physics
 
 A nanoparticle (radius `r`, complex refractive index `m(λ) = n(λ) − i·k(λ)`,
