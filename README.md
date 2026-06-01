@@ -1,5 +1,4 @@
-# Reinforcement Learning for Inverse Design of
-Mie-Scattering Nanoparticles
+# Reinforcement Learning for Inverse Design of Mie-Scattering Nanoparticles
 
 Furkan Akkoyun
 
