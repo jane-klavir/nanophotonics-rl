@@ -37,29 +37,8 @@ Other entry points:
 | `python scripts/04_gold.py` | Verbatim copy of `miepython`'s `04_gold.py` example, for reference. |
 | `python scripts/plot_random_spectrum.py` | Visualize a random spectrum from a saved synthetic dataset. |
 
-## Repository layout
 
-```
-.
-├── Materials/                       tabulated n(λ), k(λ) CSVs (one per material)
-│   ├── Ag.csv  Al.csv  Au.csv  Cu.csv  GaAs.csv  Ge.csv  Si.csv
-├── src/nano_mie/
-│   ├── simulator.py                 thin Mie wrapper around miepython
-│   ├── materials.py                 CSV loader + interpolation
-│   ├── dataset.py                   dataset builder for synthetic sweeps
-│   ├── config.py                    synthetic-grid configuration
-│   └── plotting.py                  small plotting helpers
-├── scripts/
-│   ├── generate_materials_dataset.py    main entry point (real materials)
-│   ├── generate_gold_spectra.py         gold-only diagnostic + figure
-│   ├── generate_dataset.py              synthetic grid sweep
-│   ├── plot_random_spectrum.py
-│   └── 04_gold.py                       miepython reference example
-├── data/processed/                  generated datasets (.npz)
-└── outputs/figures/                 generated figures (.png)
-```
-
-## Physics in one paragraph
+## Physics
 
 A nanoparticle (radius `r`, complex refractive index `m(λ) = n(λ) − i·k(λ)`,
 sitting in a medium of index `n_med`) hit by light of wavelength `λ` can
@@ -91,15 +70,7 @@ wl,k
 1.9370,13.78
 ```
 
-[src/nano_mie/materials.py](src/nano_mie/materials.py) exposes:
-
-| Function | Purpose |
-| --- | --- |
-| `load_material_csv(path)` | Parses one CSV. Splits on blank lines into n-block and k-block, returns `(wl_n_um, n_vals, wl_k_um, k_vals)`. The two tables are kept separate because they often sample different wavelengths. |
-| `material_nk(name, wavelengths_nm)` | Loads `Materials/<name>.csv` and linearly interpolates `n(λ), k(λ)` onto your wavelength grid (μm → nm conversion is automatic). Values outside the tabulated range are clamped to the endpoints. |
-| `available_materials()` | Lists every `.csv` in `Materials/`. |
-
-## Main dataset format (`data/processed/mie_materials_v1.npz`)
+## Main dataset format
 
 Produced by [`scripts/generate_materials_dataset.py`](scripts/generate_materials_dataset.py).
 A single compressed `.npz` with a **two-tier** layout — small material-level
@@ -223,11 +194,6 @@ print(f"  λ grid:   {wl[0]:.0f} → {wl[-1]:.0f} nm "
       f"({wl.size} points, step {wl[1]-wl[0]:.0f} nm)")
 print(f"  σ_sca peak at λ={wl[sca_i.argmax()]:.0f} nm, value={sca_i.max():.1f} nm²")
 ```
-
-That's the full description of run `i` — three scalars (`radius`, `n_medium`,
-`material_id`), the two material curves `n(λ), k(λ)` recovered by name, and
-three spectra `σ_sca, σ_abs, σ_ext` over the shared wavelength grid. Plot them
-the same way you'd plot any `(x, y)` pair:
 
 ```python
 import matplotlib.pyplot as plt
