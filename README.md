@@ -1,6 +1,6 @@
 # Nanophotonics RL
 
-ML/RL methods for nanophotonic design. The forward problem which predicts the
+RL methods for nanophotonic design. The forward problem which predicts the
 optical response of a particle from its geometry and material is solved by
 **Mie theory**. This repo uses RL to do **inverse design**: find the
 particle whose spectrum matches a desired target.
