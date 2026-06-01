@@ -11,6 +11,36 @@ The pipeline starts by using [`miepython`](https://github.com/scottprahl/miepyth
 to generate ground-truth scattering / absorption / extinction spectra for
 spherical nanoparticles across a range of radii and materials.
 
+## Reinforcement Learning & Inverse Design
+
+Instead of training a separate supervised neural network to directly predict a design from a target response, we formulate the inverse design as a target-conditioned sequential search problem navigating the precomputed Mie dataset. 
+
+The agent treats the design space as a finite Markov Decision Process (MDP):
+* **State Space (9-D):** The state vector contains the normalized current material index, radius index, scattering peak, absorption peak, the corresponding target peak observables, and the current scale-normalized error.
+* **Action Space (5 Discrete Actions):** Decrease radius, increase radius, switch to previous material, switch to next material, or STOP and commit.
+* **Reward Structure:** The agent receives a shaped reward based on the reduction of the combined error between steps. Moves that reduce error yield positive rewards; moves away yield penalties. The STOP action grants a +3 terminal bonus if the candidate satisfies the success threshold ($|\Delta\lambda| <$ 10 nm and $E \le$ 0.10).
+
+### Dueling Double-DQN Architecture
+
+We trained a **Dueling Double-DQN** to handle the search. The dueling architecture is particularly effective here because it separates the value of being at a specific material-radius state from the relative advantage of making a specific edit (e.g., changing the radius vs. switching the material).
+
+* **Network Trunk:** A shared Multilayer Perceptron (MLP) mapping $9\rightarrow256\rightarrow256$ with LayerNorm and ReLU activations.
+* **Streams:** The trunk splits into a 1D Value stream and a 5D Advantage stream, which are then recombined.
+* **Stabilizers:** The pipeline utilizes an experience replay buffer (capacity 50,000) to break trajectory correlation, alongside a slowly updated target network to minimize Bellman overestimation bias. 
+* **Optimization:** Minimized using Huber loss (smooth L1) via the Adam optimizer.
+
+![Training Curves](outputs/poster/mie_rl_training_curve.svg)
+*Training dynamics over 1700 episodes. The combined weighted error steadily decreases, crossing the 0.10 success threshold as the agent learns to navigate the dataset.*
+
+### Results
+
+Evaluated on held-out targets, the RL agent achieved a mean wavelength error of 1.0 nm and an average success rate of 72.1%. On all tested targets, the agent successfully recovered the exact material choice found by exhaustive brute-force search.
+
+![Query Summary](outputs/poster/mie_query_summary.svg)
+*Performance query summary. For a 700 nm target, the policy recovered the exact brute-force optimum: a Silicon sphere with a 223.7 nm radius.*
+
+---
+
 ## Setup
 
 Create and activate a Python environment (conda or venv), then from the repo
@@ -40,6 +70,9 @@ analytic solution to Maxwell's equations (Mie, 1908) parameterised by the
 **size parameter** `x = 2π·r·n_med / λ`. `miepython.efficiencies_mx(m, x)`
 evaluates the series for us; everything else in this repo is data plumbing
 around that one call.
+
+![Mie Peak Landscape](outputs/poster/mie_peak_landscape.svg)
+*The peak landscape of our generated dataset, illustrating the non-linear relationship between radius, material, and scattering resonances.*
 
 ## Materials folder format
 
