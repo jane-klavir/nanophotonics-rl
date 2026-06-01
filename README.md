@@ -21,7 +21,7 @@ pip install -e .
 
 ## Quickstart
 
-Generate the main materials × radii dataset (700 samples, < 1 s on a laptop):
+Generate the main materials × radii dataset (700 samples default):
 
 ```bash
 python scripts/generate_materials_dataset.py
